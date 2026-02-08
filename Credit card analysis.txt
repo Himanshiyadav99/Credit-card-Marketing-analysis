@@ -1,0 +1,355 @@
+/*Importing the file  */
+proc import datafile="/home/u64280361/CHARGING_STATIONS/WORKING.FILE/creditcardmarketing-bbm.csv"
+DBMS=csv
+out=Creditcard_analysis;
+quit;
+
+/*Checking variables   */
+proc contents data=Creditcard_analysis;
+run;
+
+/* Dropping index variable */
+proc sql;
+alter table Creditcard_analysis
+drop 'index'n;
+quit;
+
+/*Checking variables   */
+proc contents data=Creditcard_analysis;
+run;
+
+/* If total rows=total count then no duplicate values */
+proc sql;
+select count(*) as total_rows,
+       count(distinct 'Customer Number'n) as unique_customers
+from Creditcard_analysis;
+quit;
+
+/* Overall Acceptance */
+proc sql;
+select 
+    sum(case when 'Offer Accepted'n = "Ye" then 1 else 0 end) as Accepted,
+    count(*) as Total,
+    calculated Accepted / calculated Total * 100 
+    as Acceptance_Rate format=6.2
+from Creditcard_analysis;
+quit;
+/* Insights:Overall acceptance rate is 5.62%  */
+
+
+/* Income vs Acceptance */
+proc sql;
+create table income_acceptance as
+select 
+    'Income Level'n,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Acceptance_Rate format=6.2
+from Creditcard_analysis
+group by 'Income Level'n;
+quit;
+
+proc sgplot data=income_acceptance;
+    vbar 'Income Level'n / response=Acceptance_Rate datalabel;
+    yaxis label="Acceptance Rate (%)";
+    title "Acceptance Rate by Income Level";
+run;
+
+/*Insights : Lowincome people have highest rate of acceptance with 8.70% so credit card
+                 should be offered more to them  */
+
+
+/*Credit rating vs Acceptance  */
+proc sql;
+Create table Creditrating_acceptance as
+select 
+    'Credit Rating'n,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Acceptance_Rate format=6.2
+from Creditcard_analysis
+group by 'Credit Rating'n;
+quit;
+
+proc sgplot data=Creditrating_acceptance;
+    vbar 'Credit Rating'n / response=Acceptance_Rate datalabel;
+    yaxis label="Acceptance Rate (%)";
+    title "Acceptance Rate by Credit Rating";
+run;
+
+/* Insight: Customers with lower credit ratings are more likely to accept credit card offers. Based on the analysis,
+ approximately 10.63% of individuals in this group accepted the credit card offer. */
+
+/* Own your home vs Acceptance */
+proc sql;
+Create table ownhome_aceeptance as 
+select 
+    'Own Your Home'n,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Acceptance_Rate format=6.2
+from Creditcard_analysis
+group by 'Own Your Home'n;
+quit;
+
+proc sgplot data=ownhome_aceeptance;
+    vbar 'Own Your Home'n / response=Acceptance_Rate datalabel;
+    yaxis label="Acceptance Rate (%)";
+    title "Acceptance Rate by Own Home";
+run;
+
+/* Acceptance rate is almost the same 
+Non-homeowners: 5.67%
+Homeowners: 5.69%
+Owning a home does not significantly impact the likelihood of accepting a credit card offer. Better strategy for business 
+Focus on segments with higher variation (income, credit rating, age, spending habits).
+Use home ownership as a supporting variable, not a primary decision factor. */
+
+/* Mailer vs Acceptance */
+proc sql;
+Create table Mailer_type_acceptance as
+select 
+    'Mailer Type'n,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Acceptance_Rate format=6.2
+from Creditcard_analysis
+group by 'Mailer Type'n;
+quit;
+
+proc sgplot data=Mailer_type_acceptance;
+    vbar 'Mailer Type'n / response=Acceptance_Rate datalabel;
+    yaxis label="Acceptance Rate (%)";
+    title "Acceptance Rate by Mailer Acceptance";
+run;
+
+/* Postcard mailers are significantly more effective than letters, 
+generating a much higher acceptance rate (7.9% vs 3.39%), making them the better choice for credit card marketing campaigns. */
+
+/* Reward vs acceptance */
+proc sql;
+create table reward_acceptance as
+select 
+    'Reward'n,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Acceptance_Rate format=6.2
+from Creditcard_analysis
+group by 'Reward'n;
+quit;
+
+proc sgplot data=reward_acceptance;
+    vbar 'Reward'n / response=Acceptance_Rate datalabel;
+    yaxis label="Acceptance Rate (%)";
+    title "Acceptance Rate by Reward";
+run;
+/* The Air Miles reward performs best with the highest acceptance rate (7.67%),  
+ indicating customers are more attracted to travel-related benefits, followed by Points (5.93%), 
+while Cash Back has the lowest response (3.43%), suggesting it is less compelling as a primary offer in this campaign. */
+
+/* Rewad+Miles vs Acceptance */
+proc sql;
+create table reward_mailer_rate as
+select 
+    'Mailer Type'n,
+    'Reward'n,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Acceptance_Rate format=6.2
+from  Creditcard_analysis 
+group by 'Mailer Type'n, 'Reward'n;
+quit;
+
+proc sgplot data=reward_mailer_rate;
+vbar 'Mailer Type'n / response=Acceptance_Rate 
+                    group='Reward'n 
+                    groupdisplay=cluster 
+                    datalabel;
+yaxis label="Acceptance Rate (%)";
+title "Acceptance Rate by Mailer Type and Reward";
+run;
+/*Business Insights
+Postcards paired with Air Miles deliver the highest impact (10.51% acceptance), 
+ while letters—especially with Cash Back—perform the weakest, making Postcard + Air Miles the most effective campaign combination. */
+
+
+/* Average Balance Segmentation */
+
+
+data creditcard_analysis2;
+set Creditcard_analysis;
+
+if 'Average Balance'n < 500 then Balance_Group="Low";
+else if 'Average Balance'n < 1000 then Balance_Group="Medium";
+else Balance_Group="High";
+
+run;
+
+proc sql;
+create table balance_acceptance as
+select 
+    Balance_Group,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Acceptance_Rate format=6.2
+from creditcard_analysis2
+group by Balance_Group;
+quit;
+
+proc sgplot data=balance_acceptance;
+vbar Balance_Group / response=Acceptance_Rate datalabel;
+yaxis label="Acceptance Rate (%)";
+title "Acceptance Rate by Average Balance Group";
+run;
+
+/* Insight:
+Low balance customers usually show higher acceptance → need credit support.
+
+/*  Income + Credit Rating  */
+proc sql;
+create table income_credit_acceptance as
+select 
+    'Income Level'n,
+    'Credit Rating'n,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Acceptance_Rate format=6.2
+from Creditcard_analysis
+group by 'Income Level'n, 'Credit Rating'n;
+quit;
+
+proc sgplot data=income_credit_acceptance;
+vbar 'Income Level'n / response=Acceptance_Rate 
+     group='Credit Rating'n
+     groupdisplay=cluster datalabel;
+yaxis label="Acceptance Rate (%)";
+title "Acceptance Rate by Income Level and Credit Rating";
+run;
+
+/* Insight:
+This reveals the IDEAL TARGET SEGMENT.
+Example expected pattern:
+- Low/Medium income + Poor/Average credit → highest response
+- High income + Excellent credit → lowest response
+*/
+
+/* Household Size Vs acceptance */
+proc sql;
+create table household_acceptance as
+select 
+    'Household Size'n,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Acceptance_Rate format=6.2
+from Creditcard_analysis
+group by 'Household Size'n;
+quit;
+
+proc sgplot data=household_acceptance;
+vbar 'Household Size'n / response=Acceptance_Rate datalabel;
+yaxis label="Acceptance Rate (%)";
+title "Acceptance Rate by Household Size";
+run;
+
+/* Insight:Mid-range groups (3–4) drive the most consistent performance with ~5–6% acceptance due to larger volumes, 
+ while extreme groups show unstable rates (very high or zero) because of very small sample sizes. */
+
+/* Overdraft vs acceptance */
+proc sql;
+create table overdraft_acceptance as
+select 
+    'Overdraft Protection'n,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Acceptance_Rate format=6.2
+from Creditcard_analysis
+group by 'Overdraft Protection'n;
+quit;
+
+proc sgplot data=overdraft_acceptance;
+vbar 'Overdraft Protection'n / response=Acceptance_Rate datalabel;
+yaxis label="Acceptance Rate (%)";
+title "Acceptance Rate by Overdraft Protection";
+run;
+
+/* Customers without overdraft protection show a slightly higher acceptance rate (5.71%) than those with it (5.53%),
+ indicating overdraft availability does not significantly influence credit card offer acceptance. */
+
+/* FINAL TARGET SEGMENT – HIGHEST ACCEPTANCE CUSTOMERS */
+
+proc sql;
+create table comparison as
+select 
+    "Overall" as Segment,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Rate format=6.2
+from creditcard_analysis
+
+union all
+
+select 
+    "Targeted" as Segment,
+    count(*) as Total,
+    sum(case when 'Offer Accepted'n="Ye" then 1 else 0 end) as Accepted,
+    calculated Accepted / calculated Total * 100 as Rate format=6.2
+from creditcard_analysis
+where 'Income Level'n="Low"
+and 'Credit Rating'n="Low"
+and 'Average Balance'n < 500
+and 'Reward'n="Air Miles";
+quit;
+
+proc sgplot data=comparison;
+vbar Segment / response=Rate datalabel;
+yaxis label="Acceptance Rate (%)";
+title "Overall vs Targeted Acceptance Rate";
+run;
+
+/* Key Insights from the Graph 
+1) Targeted marketing works MUCH better
+Overall acceptance rate: 5.68%
+Targeted segment acceptance: 18.06%
+This is a 3X improvement in response.
+
+2) Right customer selection is the main driver
+Customers more likely to accept:
+Low income
+Low average balance
+Low credit rating
+Air Miles reward
+These customers:
+Need credit support
+Are more attracted to rewards
+Respond better to offers
+
+3) Mass marketing vs Smart targeting
+Mass campaign → 5–6% response
+Focused campaign → 18% response
+Same product, but better audience = higher success
+
+4) Business value
+If bank sends 10,000 offers:
+Without targeting
+→ ~568 accept
+With targeting
+→ ~1806 accept
+That’s 3x more customers without increasing campaign size.
+
+5) Final business conclusion (strong statement for project)
+Instead of sending credit card offers to everyone, the bank should target low-income, low-balance, low-credit customers with Air Miles rewards, as this segment shows the highest likelihood of acceptance.
+
+6) Strategy recommendation
+Focus campaigns on:
+Financially constrained customers
+Reward-driven segments
+Travel-benefit seekers
+This will:
+Increase conversions
+Reduce marketing cost
+ Improve campaign ROI */
+
+
+
+
+
